@@ -8,7 +8,8 @@ OWI.factory("StorageService", function() {
       hdVideos: false,
       currentTheme: 'standard',
       audioVolume: 0.5,
-      countIcons: true
+      countIcons: true,
+      syncDisabled: true
     },
     getData: function() {
       return service.data;
@@ -52,11 +53,11 @@ OWI.factory("DataService", ["$http", "$q", "StorageService", "$timeout", functio
     var out = {
       checked: {}
     };
+
     for (var hero in data.heroes) {
-      out.checked[hero] = {"skins":{},"emotes":{},"intros":{},"sprays":{},"voicelines":{},"poses":{},"icons":{}};
+      out.checked[hero] = Object.assign({"skins":{},"emotes":{},"intros":{},"sprays":{},"voicelines":{},"poses":{},"icons":{},"weapons":{}}, storedData[hero]);
     }
 
-    Object.assign(out.checked, storedData);
     Object.assign(service, out, data);
     $timeout(function() {
       service.initialized = true;
@@ -123,9 +124,8 @@ OWI.factory('CostAndTotalService', ["DataService", "StorageService", "$q", "$tim
     skinsLegendary: 'skins'
   };
 
-  var isValidItem = function(item, event) {
-    var hasEvent = item.event || event;
-    return !item.achievement && item.quality && (!hasEvent || (hasEvent && hasEvent !== 'SUMMER_GAMES_2016'));
+  var isValidItem = function(item) {
+    return !item.achievement && item.quality;
   };
   
   var countIcons = StorageService.getSetting('countIcons');
@@ -135,6 +135,8 @@ OWI.factory('CostAndTotalService', ["DataService", "StorageService", "$q", "$tim
     totals: {},
     heroes: {},
     events: {},
+    oldEvents: ['HALLOWEEN_2016', 'SUMMER_GAMES_2016', 'WINTER_WONDERLAND_2016'],
+    newEvents: ['HALLOWEEN', 'SUMMER_GAMES', 'WINTER_WONDERLAND'],
     init: function() {
       DataService.waitForInitialization().then(function() {
         console.info("Calculating totals and costs");
@@ -182,14 +184,14 @@ OWI.factory('CostAndTotalService', ["DataService", "StorageService", "$q", "$tim
               service[TYPE][what.id].totals[type].selected++;
             }
             if (type == 'icons') {
-              if (!countIcons && !isEvent) {
+              if (!countIcons) {
                 service[TYPE][what.id].totals.overall.total--;
                 if (isSelected) service[TYPE][what.id].totals.overall.selected--;
               }
               continue;
             }
             if (isValidItem(item)) {
-              var price = DataService.prices[item.quality] * (((item.event || isEvent) && item.group !== 'SUMMER_GAMES_2016') ? 3 : 1);
+              var price = DataService.prices[item.quality] * (((item.event || isEvent) && !service.oldEvents.includes(item.group)) ? 3 : 1);
               service[TYPE][what.id].cost.total += price;
               if (isSelected) {
                 service[TYPE][what.id].cost.selected += price;
@@ -203,17 +205,17 @@ OWI.factory('CostAndTotalService', ["DataService", "StorageService", "$q", "$tim
       }
     },
     updateItem: function(item, type, hero, event, idOverride) {
-      const itemID = idOverride || item.id;
+      var itemID = idOverride || item.id;
       var isSelected = DataService.checked[item.hero || hero][TYPES[type] || type][itemID];
       event = item.event || event;
       var eventType;
-      if (event === 'SUMMER_GAMES') {
-        eventType = (type == 'skins' && item.quality == 'legendary' && item.group !== 'SUMMER_GAMES_2016') ? 'skinsLegendary' : type;
+      if (service.newEvents.includes(event)) {
+        eventType = (type == 'skins' && item.quality == 'legendary' && !service.oldEvents.includes(item.group)) ? 'skinsLegendary' : type;
       } else {
         eventType = type == 'skins' ? (item.quality == 'epic' ? 'skinsEpic' : 'skinsLegendary') : type;
       }
       var val = isSelected ? 1 : -1;
-      var price = DataService.prices[item.quality] * ((event && item.group !== 'SUMMER_GAMES_2016') ? 3 : 1);
+      var price = DataService.prices[item.quality] * ((event && !service.oldEvents.includes(item.group)) ? 3 : 1);
       var isValid = isValidItem(item, event);
       service.heroes[hero].cost.prev = service.heroes[hero].cost.remaining;
       service.heroes[hero].totals[type].selected += val;
@@ -267,7 +269,7 @@ OWI.factory('CostAndTotalService', ["DataService", "StorageService", "$q", "$tim
           }
           if (type == 'icons') continue;
           if (isValidItem(item)) {
-            var price = DataService.prices[item.quality] * ((item.event && item.event !== 'SUMMER_GAMES_2016') ? 3 : 1);
+            var price = DataService.prices[item.quality] * ((item.group && !service.oldEvents.includes(item.group)) ? 3 : 1);
             out.cost.total += price;
             if (isSelected) {
               out.cost.selected += price;
@@ -396,4 +398,263 @@ OWI.factory('CompatibilityService', ["StorageService", function(StorageService) 
   }
 
   return service;
+}]);
+
+OWI.factory('GoogleAPI', ["$rootScope", "$timeout", "$q", "$http", "StorageService", function($rootScope, $timeout, $q, $http, StorageService) {
+  var CLIENT_ID = '583147653478-cfkb2hkhdd1iocde6omf6ro2oi52qj98.apps.googleusercontent.com';
+  var API_KEY = 'AIzaSyDGV8ytVdbMrBhonprSufoZwboxszL25Ww';
+  var SCOPES = 'https://www.googleapis.com/auth/drive.appfolder';
+
+  var service = {
+    syncTimeout: 1000 * 60 * 20, // 20 mins
+    version: '1',
+    fileName: 'overwatch_item_tracker_data_NO_TOUCHY_PLEASE.json',
+    dataFileID: localStorage.getItem('gdrive.file_id'),
+    lastSync: localStorage.getItem('gdrive.last_sync'),
+    isSignedIn: false,
+    user: {},
+    waitForLoad: function() {
+      function waitForInitialize() {
+        if (window.gapi) {
+          gapi.load('client:auth2', service.init);
+        } else {
+          $timeout(waitForInitialize, 30);
+        }
+      }
+
+      waitForInitialize();
+    },
+    init: function() {
+      gapi.client.init({
+        apiKey: API_KEY,
+        clientId: CLIENT_ID,
+        scope: SCOPES
+      }).then(function () {
+        gapi.auth2.getAuthInstance().isSignedIn.listen(service.updateSigninState);
+        service.updateSigninState(gapi.auth2.getAuthInstance().isSignedIn.get());
+      });
+    },
+    updateSigninState: function(isSignedIn) {
+      if (isSignedIn) {
+        $rootScope.$broadcast('google:login', { event: 'SIGN_IN', user: service.user });
+        service.user = gapi.auth2.getAuthInstance().currentUser.get().getBasicProfile();
+        service.setupSync();
+      } else {
+        $rootScope.$broadcast('google:login', { event: 'SIGN_OUT' });
+      }
+
+      this.isSignedIn = isSignedIn;
+
+    },
+    login: function() {
+      var instance = gapi.auth2.getAuthInstance();
+      if (instance) {
+        instance.signIn().catch(function(err) {
+          console.log('Error signing in', err);
+          $rootScope.$broadcast('google:login', { event: 'ERROR', message: err.error });
+        });
+      }
+    },
+    signOut: function() {
+      var instance = gapi.auth2.getAuthInstance();
+      if (instance) {
+        instance.signOut();
+      }
+    },
+    setupSync: function() {
+      if (StorageService.getSetting('syncDisabled')) {
+        console.log('Google Sync disabled');
+        return;
+      }
+
+      function sync() {
+        console.log('Checking sync');
+        if (!service.lastSync || (+service.lastSync + service.syncTimeout < Date.now())) {
+          console.log('Syncing with Google');
+          service.update().then(function(success) {
+            if (success) {
+              console.log('Successfully synced with Google');
+              service.lastSync = Date.now();
+              localStorage.setItem('gdrive.last_sync', service.lastSync);
+            } else {
+              console.error('Error while syncing with Google Drive');
+            }
+          });
+        } else {
+          console.log('Not syncing');
+        }
+      }
+      
+      sync();
+      setInterval(sync, service.syncTimeout);
+    },
+    // Load stored JSON file from Google, uses normal HTTP request as using the gapi request seems to return
+    //  a gzipped or encoded version of some kind and i cbf dealing with that shit
+    getData: function() {
+      var token = gapi.client.getToken();
+      var url = 'https://www.googleapis.com/drive/v3/files/' + service.dataFileID;
+
+      if (!token || !token.access_token || !service.dataFileID) {
+        return Promise.resolve(false);
+      }
+
+      return $http.get(url, {
+        params: {
+          alt: 'media'
+        },
+        headers: {
+          'Authorization': (token.token_type + ' ' + token.access_token)
+        }
+      }).then(function(response) {
+        if (response.status === 200 && response.data) {
+          console.log('Fetched data? from', new Date(response.data._synced_at));
+          return response.data;
+        }
+
+        return null;
+      }, function(err) {
+        console.error('Error fetchingd data from google', err);
+        return null;
+      });
+    },
+    update: function(data) {
+      return new $q(function(resolve, reject) {
+        if (service.dataFileID) {
+          console.log('File id stored, updating file')
+          service.updateFile(data).then(resolve, reject);
+        } else {
+          console.log('No file id detected, checking if file exists')
+          service.findDataFile().then(function(exists) {
+            if (exists) {
+              console.log('File detected, updating')
+              service.updateFile(data).then(resolve, reject);
+            } else {
+              console.log('no file detected, creating')
+              service.createFile(data).then(function(data) {
+                console.log('file created, yay')
+                service.dataFileID = data.id
+                localStorage.setItem('gdrive.file_id', data.id)
+                resolve()
+              }, reject);
+            }
+          });
+        }
+      }).then(function() {
+        return true;
+      }, function(err) {
+        console.error('Error uploading file to google', err);
+        return false;
+      });
+    },
+    // Checks to see if we already have a file saved, if we do we can update it if we don't, it needs to be made
+    findDataFile: function() {
+      return new $q(function(resolve) {
+        var request = gapi.client.request({
+          path: '/drive/v3/files/',
+          method: 'GET',
+          params: {
+            spaces: ['appDataFolder']
+          }
+        });
+  
+        request.execute(function(data) {
+          if (data.error || data.files.length === 0) {
+            return resolve(false);
+          }
+
+          for (var file of data.files) {
+            if (file.name === service.fileName && file.mimeType === 'application/json') {
+              service.dataFileID = file.id
+              localStorage.setItem('gdrive.file_id', file.id)
+              resolve(true);
+              return
+            }
+          }
+          
+          resolve(false)
+        });
+      });
+    },
+    createFile: function(data) {
+      return service.sendRequest(data, {
+        mimeType: 'application/json',
+        name: service.fileName,
+        parents: ['appDataFolder']
+      }, 'POST', 'https://www.googleapis.com/upload/drive/v3/files');
+    },
+    updateFile: function(data) {
+      return service.sendRequest(data, {
+        mimeType: 'application/json'
+      }, 'PATCH', 'https://www.googleapis.com/upload/drive/v3/files/' + service.dataFileID);
+    },
+    // Weird ass shit required to save/update a file using Multipart form.
+    sendRequest: function(data, metadata, method, url) {
+      return new $q(function(resolve, reject) {
+        var boundary = '-------314159265358979323846264';
+        var delimiter = "\r\n--" + boundary + "\r\n";
+        var close_delim = "\r\n--" + boundary + "--";
+
+        var body = {
+          _version: service.version,
+          _synced_at: Date.now(),
+          data: data
+        };
+  
+        var base64Data = btoa(JSON.stringify(body));
+        var multipartRequestBody =
+            delimiter +
+            'Content-Type: application/json\r\n\r\n' +
+            JSON.stringify(metadata) +
+            delimiter +
+            'Content-Type: ' + 'application/json' + '\r\n' +
+            'Content-Transfer-Encoding: base64\r\n' +
+            '\r\n' +
+            base64Data +
+            close_delim;
+        var request = gapi.client.request({
+          path: url,
+          method: method,
+          params: {
+            uploadType: 'multipart'
+          },
+          headers: {
+            'Content-Type': 'multipart/mixed; boundary="' + boundary + '"'
+          },
+          body: multipartRequestBody
+        });
+  
+        request.execute(function(data) {
+          if (data.error) {
+            return reject(data.error);
+          }
+
+          localStorage.setItem('google_drive_data_file_created', true);
+          return resolve(data);
+        });
+      });
+    }
+  };
+
+  return service;
+}]);
+
+OWI.factory('UrlService', function() {
+  var isLocal = location.host === 'localhost:5000'
+  var imageHost = isLocal
+    ? 'http://localhost:5000/resources'
+    : 'https://overwatchitemtracker.com/resources'
+
+  return {
+    get: function(url) {
+      if (!url) {
+        return void 0
+      }
+
+      return imageHost + url
+    }
+  }
+})
+
+OWI.run(["GoogleAPI", function(GoogleAPI) {
+  GoogleAPI.waitForLoad();
 }]);

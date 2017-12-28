@@ -493,7 +493,7 @@
       "reward": "Junkenstein's Revenge",
       "quality": "common",
       "type": "spray",
-      "description": "Win Junkenstein's Revenge on medium difficulty.",
+      "description": "Win Junkenstein's Revenge on Hard difficulty.",
       "hero": "all"
     },
     "not-a-scratch": {
@@ -501,7 +501,7 @@
       "reward": "The Reapening",
       "quality": "common",
       "type": "spray",
-      "description": "Win Junkenstein's Revenge on medium difficulty with no damage to the door.",
+      "description": "Win Junkenstein's Revenge on Hard difficulty with no damage to the door.",
       "hero": "all"
     },
     "four-they-were": {
@@ -517,7 +517,7 @@
       "reward": "Halloween Special",
       "quality": "common",
       "type": "spray",
-      "description": "Win Junkenstein's Revenge on hard difficulty.",
+      "description": "Win Junkenstein's Revenge on Legendary difficulty.",
       "hero": "all"
     },
     "hack-the-planet": {
@@ -768,6 +768,54 @@
       "type": "spray",
       "hero": "all"
     },
+    "season-6-competitor": {
+      "name": null,
+      "description": "Unlocked by completing Season 6 placement matches",
+      "reward": "Season 6 Competitor",
+      "quality": "common",
+      "type": "spray",
+      "hero": "all"
+    },
+    "season-6-hero": {
+      "name": null,
+      "description": "Unlocked by achieving top 500 ranking at the end of Season 6",
+      "reward": "Season 6 Hero",
+      "quality": "common",
+      "type": "spray",
+      "hero": "all"
+    },
+    "season-7-competitor": {
+      "name": null,
+      "description": "Unlocked by completing Season 7 placement matches",
+      "reward": "Season 7 Competitor",
+      "quality": "common",
+      "type": "spray",
+      "hero": "all"
+    },
+    "season-7-hero": {
+      "name": null,
+      "description": "Unlocked by achieving top 500 ranking at the end of Season 7",
+      "reward": "Season 7 Hero",
+      "quality": "common",
+      "type": "spray",
+      "hero": "all"
+    },
+    "season-8-competitor": {
+      "name": null,
+      "description": "Unlocked by completing Season 8 placement matches",
+      "reward": "Season 8 Competitor",
+      "quality": "common",
+      "type": "spray",
+      "hero": "all"
+    },
+    "season-8-hero": {
+      "name": null,
+      "description": "Unlocked by achieving top 500 ranking at the end of Season 8",
+      "reward": "Season 8 Hero",
+      "quality": "common",
+      "type": "spray",
+      "hero": "all"
+    },
     "wizard": {
       "name": null,
       "description": "Unlocked as part of the Diablo 20th Anniversary celebration",
@@ -838,6 +886,70 @@
       "reward": "Copa Lúcioball Hero",
       "quality": "common",
       "type": "spray",
+      "hero": "all"
+    },
+    "survivor": {
+      "name": "Survivor",
+      "description": "Survive 4 bonus waves in Junkenstein Endless on Expert difficulty.",
+      "reward": "The Witch",
+      "quality": "common",
+      "type": "spray",
+      "hero": "all"
+    },
+    "dawn-breaks": {
+      "name": "Dawn Breaks",
+      "description": "Win Junkenstein's Revenge on Expert difficulty.",
+      "reward": "The Reaper",
+      "quality": "common",
+      "type": "spray",
+      "hero": "all"
+    },
+    "six-they-were": {
+      "name": "Six They Were",
+      "description": "Win Junkenstein Endless with 6 different heroes.",
+      "reward": "My Creations",
+      "quality": "common",
+      "type": "spray",
+      "hero": "all"
+    },
+    "unscathed": {
+      "name": "Unscathed",
+      "description": "Win Junkenstein Endless on Hard difficulty with no damage to the door.",
+      "reward": "The Monster",
+      "quality": "common",
+      "type": "spray",
+      "hero": "all"
+    },
+    "simple-trigonometry": {
+      "name": "Simple Trigonometry",
+      "reward": "Pixel",
+      "quality": "common",
+      "type": "spray",
+      "description": "Fully deplete both types of Moira's Biotic Orb without dying in Quick or Competitive Play.",
+      "hero": "moira"
+    },
+    "antipode": {
+      "name": "Antipode",
+      "reward": "Cute",
+      "quality": "common",
+      "type": "spray",
+      "description": "Hit 7 targets simultaneously with Moira's Coalescence in Quick or Competitive Play.",
+      "hero": "moira"
+    },
+    "thinking-with-your-stomach": {
+      "name": "Thinking With Your Stomach",
+      "reward": "Yeti",
+      "quality": "common",
+      "type": "spray",
+      "description": "Eat 4 meat as the Yeti in Yeti Hunter.",
+      "hero": "all"
+    },
+    "yeti-catcher": {
+      "name": "Antipode",
+      "reward": "Yeti Hunter",
+      "quality": "common",
+      "type": "spray",
+      "description": "Trap the Yeti as a Hunter in Yeti Hunter.",
       "hero": "all"
     }
   },
@@ -938,6 +1050,12 @@
     "season-4-hero": "season-4-hero",
     "season-5-competitor": "season-5-competitor",
     "season-5-hero": "season-5-hero",
+    "season-6-competitor": "season-6-competitor",
+    "season-6-hero": "season-6-hero",
+    "season-7-competitor": "season-7-competitor",
+    "season-7-hero": "season-7-hero",
+    "season-8-competitor": "season-8-competitor",
+    "season-8-hero": "season-8-hero",
     "wizard": "wizard",
     "witch-doctor": "witch-doctor",
     "monk": "monk",
@@ -946,6 +1064,14 @@
     "barbarian": "barbarian",
     "summer-games-2016": "summer-games-2016",
     "copa-lucioball-competitor": "copa-lucioball-competitor",
-    "copa-lucioball-hero": "copa-lucioball-hero"
+    "copa-lucioball-hero": "copa-lucioball-hero",
+    "the-witch": "survivor",
+    "the-reaper": "dawn-breaks",
+    "my-creations": "six-they-were",
+    "the-monster": "unscathed",
+    "moira-pixel": "simple-trigonometry",
+    "moira-cute": "antipode",
+    "yeti": "thinking-with-your-stomach",
+    "yeti-hunter": "yeti-catcher"
   }
 }

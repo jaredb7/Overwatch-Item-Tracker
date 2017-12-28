@@ -100,6 +100,14 @@ const data = {
       highlight: "#ffea95"
     }
   },
+  moira: {
+    class: CLASSES.SUPPORT,
+    description: "Equal parts brilliant and controversial, Talon scientist Moira O'Deorain is on the cutting edge of genetic engineering, searching for a way to rewrite the fundamental building blocks of life.",
+    colors: {
+      primary: "#691ccf",
+      highlight: "#7e30e3"
+    }
+  },
   orisa: {
     class: CLASSES.TANK,
     description: "Built from parts of one of Numbani's short-lived OR15 defense robots, Orisa is the city's newest protector, though she still has much to learn.",

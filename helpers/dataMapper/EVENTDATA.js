@@ -1,32 +1,38 @@
 const { qualityOrder } = require('./utils.js');
-const CURRENTEVENT = 'SUMMER_GAMES';
+const CURRENTEVENT = 'WINTER_WONDERLAND';
 
 const EVENTS = {
-  SUMMER: 'SUMMER_GAMES',
+  SUMMER16: 'SUMMER_GAMES_2016',
   HALLOWEEN16: 'HALLOWEEN_2016',
   CHRISTMAS16: 'WINTER_WONDERLAND_2016',
-  ROOSTER17: 'YEAR_OF_THE_ROOSTER_2017',
+  LUNAR17: 'LUNAR_NEW_YEAR_2017',
   UPRISING17: 'UPRISING_2017',
-  ANNIVERSARY17: 'ANNIVERSARY_2017'
+  ANNIVERSARY17: 'ANNIVERSARY_2017',
+  SUMMER: 'SUMMER_GAMES',
+  HALLOWEEN: 'HALLOWEEN',
+  WINTER: 'WINTER_WONDERLAND',
+  LUNAR: 'LUNAR_NEW_YEAR',
+  UPRISING: 'UPRISING',
+  ANNIVERSARY: 'ANNIVERSARY',
 };
 
 const EVENTORDER = {
   undefined: 0, // no event
-  [EVENTS.SUMMER]: 7,
-  [EVENTS.HALLOWEEN16]: 1,
-  [EVENTS.CHRISTMAS16]: 2,
-  [EVENTS.ROOSTER17]: 3,
-  [EVENTS.UPRISING17]: 4,
-  [EVENTS.ANNIVERSARY17]: 5
+  [EVENTS.SUMMER]: 1,
+  [EVENTS.HALLOWEEN]: 2,
+  [EVENTS.WINTER]: 3,
+  [EVENTS.LUNAR]: 4,
+  [EVENTS.UPRISING]: 5,
+  [EVENTS.ANNIVERSARY]: 6
 };
 
 const EVENTNAMES = {
   [EVENTS.SUMMER]: 'Summer Games',
-  [EVENTS.HALLOWEEN16]: 'Halloween Terror 2016',
-  [EVENTS.CHRISTMAS16]: 'Winter Wonderland 2016',
-  [EVENTS.ROOSTER17]: 'Year of the Rooster 2017',
-  [EVENTS.UPRISING17]: 'Uprising 2017',
-  [EVENTS.ANNIVERSARY17]: 'Anniversary 2017'
+  [EVENTS.HALLOWEEN]: 'Halloween Terror',
+  [EVENTS.WINTER]: 'Winter Wonderland',
+  [EVENTS.LUNAR]: 'Year of the Rooster',
+  [EVENTS.UPRISING]: 'Uprising',
+  [EVENTS.ANNIVERSARY]: 'Anniversary'
 };
 
 const EVENTTIMES = {
@@ -34,23 +40,23 @@ const EVENTTIMES = {
   //  "start": "1470164400000",
   //  "end": "1471928400000"
   //},
-  [EVENTS.HALLOWEEN16]: {
-    "start": "1476208800000",
-    "end": "1478059200000"
-  },
+  //[EVENTS.HALLOWEEN16]: {
+  //  "start": "1476208800000",
+  //  "end": "1478059200000"
+  //},
   [EVENTS.CHRISTMAS16]: {
     "start": "1481652000000",
     "end": "1483416000000"
   },
-  [EVENTS.ROOSTER17]: {
+  [EVENTS.LUNAR]: {
     "start": "1485280800000",
     "end": "1487066400000"
   },
-  [EVENTS.UPRISING17]: {
+  [EVENTS.UPRISING]: {
     "start": "1491937200000",
     "end": "1493769600000"
   },
-  [EVENTS.ANNIVERSARY17]: {
+  [EVENTS.ANNIVERSARY]: {
     "start": "1495551600000",
     "end": "1497348000000"
   },
@@ -58,6 +64,14 @@ const EVENTTIMES = {
     "start": "1502204400000",
     "end": "1504000800000"
   },
+  [EVENTS.HALLOWEEN]: {
+    "start": "1507658400000",
+    "end": "1509613200000"
+  },
+  [EVENTS.WINTER]: {
+    "start": "1513101600000",
+    "end": "1514890800000"
+  }
 };
 
 const EVENT_ITEM_ORDER = {
@@ -65,9 +79,33 @@ const EVENT_ITEM_ORDER = {
     "icons": ['heroName', 'name'],
     "skins": [a => qualityOrder[a.quality], 'heroName', 'name']
   },
+  [EVENTS.HALLOWEEN]: {
+    "icons": ['heroName', 'name'],
+    "skins": [a => qualityOrder[a.quality], 'heroName', 'name']
+  },
+  [EVENTS.WINTER]: {
+    "icons": ['name'],
+    "skins": [a => qualityOrder[a.quality], 'heroName', 'name']
+  },
   [EVENTS.ANNIVERSARY17]: {
     "icons": ['heroName', 'name']
   }
 };
 
-module.exports = { EVENTS, EVENTNAMES, EVENTTIMES, EVENTORDER, CURRENTEVENT, EVENT_ITEM_ORDER };
+// Mapping of cases where the new item previews are only stored under the events so when the hero data
+// is generated it links the preview to the preview stored under the event. This is because in most cases
+// heroes have their own item previews seperate from events but this is not always the case as I am lazy.
+const EVENT_PREVIEWS = {
+  [EVENTS.ANNIVERSARY17]: ['emotes'],
+  [EVENTS.SUMMER]: ['emotes', 'intros'],
+  [EVENTS.HALLOWEEN]: ['emotes', 'intros'],
+  [EVENTS.WINTER]: ['emotes', 'intros']
+}
+
+const NEW_EVENTS = [
+  EVENTS.SUMMER,
+  EVENTS.HALLOWEEN,
+  EVENTS.WINTER
+]
+
+module.exports = { EVENTS, EVENTNAMES, EVENTTIMES, EVENTORDER, CURRENTEVENT, EVENT_ITEM_ORDER, EVENT_PREVIEWS, NEW_EVENTS };
