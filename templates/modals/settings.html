@@ -6,11 +6,11 @@
   <div class="modal-body" id="modal-body">
     <uib-tabset justified="true">
       <uib-tab index="0" heading="General Settings">
-        <div class="setting">
+        <!-- <div class="setting">
           <h3>Particles</h3>
           <p>Disable or enable particles (snow effect) on the page</p>
           <div class="btn btn-primary" ng-click="settings.toggleSetting('particles', true)">{{::settings.particles ? 'Disable' : 'Enable'}}</div>
-        </div>
+        </div> -->
         <div class="setting">
           <h3>Select All Items</h3>
           <p>Marks all items for every event as selected</p>
@@ -35,8 +35,8 @@
           <h3>Audio Volume</h3>
           <p>Set the volume at which videos and audio is played at (default 50%)</p>
           <div class="range-input">
-            <input type="range" min="0.0" max="1.0" step="0.1" ng-change="settings.setVolume()" ng-model="settings.audioVolume" value="{{settings.audioVolume}}" />
-            <span>{{settings.audioVolume * 100}}%</span>
+            <input type="range" min="0.0" max="1.0" step="0.05" ng-change="settings.setVolume()" ng-model="settings.audioVolume" value="{{settings.audioVolume}}" />
+            <span>{{(settings.audioVolume * 100).toFixed(0)}}%</span>
           </div>
         </div>
       </uib-tab>

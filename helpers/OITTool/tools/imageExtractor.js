@@ -5,16 +5,16 @@ const { eachLimit } = require('async');
 const { exec } = require('child_process');
 
 var TYPES = {
-  Icons: 'icons',
-  Sprays: 'sprays'
+  Portrait: 'icons',
+  Spray: 'sprays'
 };
 
 const checkDirs = () => {
   fs.stat(`./!toBeConverted`, err => {
     if (err) {
       fs.mkdirSync(`./!toBeConverted`);
-      fs.mkdirSync(`./!toBeConverted/Icons`);
-      fs.mkdirSync(`./!toBeConverted/Sprays`);
+      fs.mkdirSync(`./!toBeConverted/Portrait`);
+      fs.mkdirSync(`./!toBeConverted/Spray`);
     }
   });
   fs.stat('./images', err => {
@@ -26,35 +26,62 @@ const findImages = hero => {
   return new Promise(resolve => {
     const base = hero.length ? 'Heroes/' : 'General';
     const heroID = getCleanID(hero);
+
     getDirectories(`./${base}${hero}`).then(types => {
-      if (!types.includes('Icons') && !types.includes('Sprays')) return resolve();
+      if (!types.includes('Portrait') && !types.includes('Spray')) return resolve();
       Promise.all(types.map(type => {
         return new Promise(res => {
-          if (type !== 'Icons' & type !== 'Sprays') return res();
+          if (type !== 'Portrait' && type !== 'Spray') return res();
           moveImages(hero, type, heroID).then(res);
         });
       })).then(resolve);
+    }).catch(err => {
+      console.error(err)
+      resolve()
     });
   });
 };
 
+const _moveImages = (files, heroId, type, where) => {
+  return new Promise(res => {
+    files = cleanFileIDs(files, heroId);
+    let total = 0
+    files.forEach(file => {
+      if (fs.statSync(`${where}/${file.name}`).isDirectory()) {
+        return
+      }
+
+      total++;
+      fs.createReadStream(`${where}/${file.name}`).pipe(fs.createWriteStream(`./!toBeConverted/${type}/${file.cleanName}.TIF`));
+    });
+    setTimeout(() => {
+      res(total);
+    }, 1000);
+  })
+}
+
 const moveImages = (heroDir, type, heroID) => {
   return new Promise((resolve, reject) => {
     const base = heroDir ? `Heroes/${heroDir}` : 'General';
+    const isGeneral = base === 'General'
+
     return getDirectories(`./${base}/${type}`).then(events => {
       var totalFiles = 0;
       return Promise.all(events.map(event => {
-        return new Promise(res => {
-          return getDirectories(`./${base}/${type}/${event}`).then(files => {
-            files = cleanFileIDs(files, heroID);
-            files.forEach(file => {
-              totalFiles++;
-              fs.createReadStream(`./${base}/${type}/${event}/${file.name}`).pipe(fs.createWriteStream(`./!toBeConverted/${type}/${file.cleanName}.dds`));
-            });
-            setTimeout(() => {
-              res();
-            }, 1000);
-          });
+        return getDirectories(`./${base}/${type}/${event}`).then(typesOrFiles => {
+          if (isGeneral) {
+            return _moveImages(typesOrFiles, heroID,  type, `./${base}/${type}/${event}`).then(total => {
+              totalFiles += total
+            })
+          }
+
+          return Promise.all(typesOrFiles.map(otherType => {
+            return getDirectories(`./${base}/${type}/${event}/${otherType}`).then(files => {
+              return _moveImages(files, heroID,  type, `./${base}/${type}/${event}/${otherType}`).then(total => {
+                totalFiles += total
+              })
+            })
+          }))
         });
       })).then(() => {
         console.log(`[Hero] ${heroID || 'General'} - Got ${totalFiles} ${type} files`);
@@ -73,7 +100,7 @@ const convertFiles = () => {
         console.log(`-- Converting images to png`);
         // timeout prevents the first icon from being converted incorrectly for some reason
         setTimeout(() => {
-          exec(`mogrify -path ./images -format png ./!toBeConverted/${type}/*.dds`, err => {
+          exec(`mogrify -path ./images -format png ./!toBeConverted/${type}/*.TIF`, err => {
             if (err) return reject(`Error while mogrify'ing images! \n ${err}`);
             console.log("-- Optimising images with pngquant");
             exec(`pngquant ./images/*.png --ext=.png --speed 1 --force --strip`, err2 => {

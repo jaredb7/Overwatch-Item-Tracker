@@ -1,0 +1,49 @@
+Unlocks for Bastion
+	Winter Unlocks
+		Toast (Rare VictoryPose)
+			IS_STANDARD
+
+Unlocks for Sombra
+	Winter Unlocks
+		Toast (Rare VictoryPose)
+			IS_STANDARD
+
+Unlocks for Lúcio
+	Other Unlocks
+		Dance Party (Legendary Emote)
+		2019 Pacific All-Stars (Legendary Skin)
+			Unlocked with purchase of 2019 Pacific All-Stars skin
+
+Unlocks for Genji
+	Other Unlocks
+		2018 Pacific All-Stars (Legendary Skin)
+			Unlocked with purchase of 2018 Pacific All-Stars skin
+
+Unlocks for Tracer
+	Other Unlocks
+		2018 Atlantic All-Stars (Legendary Skin)
+			Unlocked with purchase of 2018 Atlantic All-Stars skin
+
+Unlocks for Mercy
+	Other Unlocks
+		2019 Atlantic All-Stars (Legendary Skin)
+			Unlocked with purchase of 2019 Atlantic All-Stars skin
+
+Unlocks for Doomfist
+	Other Unlocks
+		Thunder (Legendary Skin)
+			Unlocked with purchase of the San Francisco Shock 2019 Championship Doomfist Thunder skin
+
+Unlocks for Winston
+	Other Unlocks
+		Flying Ace (Legendary Skin)
+			Unlocked with purchase of the London Spitfire 2018 Championship Winston Flying Ace skin
+
+Unlocks for Zenyatta
+	Other Unlocks
+		Zen-nakji (Legendary Skin)
+			Unlocked with purchase of the Overwatch League 2018 MVP Zen-nakji skin
+
+Unlocks for Brigitte
+	Other Unlocks
+		Goat (Legendary Skin)

@@ -5,7 +5,9 @@
   "scripts": {
     "gen-data": "node ./helpers/dataMapper.js",
     "gen-missing-data": "node ./helpers/dataMapper.js missing",
-    "lint": "eslint -f node_modules/eslint-formatter-pretty --cache --max-warnings 100 js --ignore-pattern js/vendor/**"
+    "test-previews": "node ./helpers/scripts/preview-checker.js",
+    "lint": "eslint -f node_modules/eslint-formatter-pretty --cache --max-warnings 100 js --ignore-pattern js/vendor/**",
+    "dev": "concurrently \"serve -c 0\" \"gulp dev\" \"start http://localhost:5000\""
   },
   "repository": {
     "type": "git",
@@ -13,17 +15,30 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "async": "^2.2.0",
-    "babel-eslint": "^8.0.2",
-    "chalk": "^2.3.0",
-    "eslint": "^4.12.1",
-    "eslint-formatter-pretty": "^1.3.0",
-    "eslint-plugin-angular": "^3.1.1",
-    "eslint-plugin-es5": "^1.1.0",
-    "eslint-plugin-standard": "^3.0.1",
-    "lodash": "^4.17.4",
-    "moment": "^2.19.3",
-    "serve": "^6.4.1"
+    "async": "2.6.1",
+    "babel-eslint": "10.1.0",
+    "chalk": "4.0.0",
+    "concurrently": "5.1.0",
+    "eslint": "6.8.0",
+    "eslint-formatter-pretty": "3.0.1",
+    "eslint-plugin-angular": "4.0.1",
+    "eslint-plugin-es5": "1.5.0",
+    "eslint-plugin-standard": "4.0.1",
+    "gulp": "4.0.2",
+    "gulp-cli": "2.2.0",
+    "gulp-concat": "2.6.1",
+    "gulp-csso": "4.0.1",
+    "gulp-plumber": "1.2.1",
+    "gulp-rename": "2.0.0",
+    "gulp-sass": "^4.0.2",
+    "lodash": "4.17.15",
+    "moment": "2.24.0",
+    "request": "2.88.2",
+    "sass": "^1.26.3",
+    "serve": "11.3.0",
+    "stylelint": "13.3.2",
+    "stylelint-config-standard": "20.0.0",
+    "stylelint-scss": "3.17.0"
   },
   "license": "Beerware"
 }

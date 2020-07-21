@@ -3,15 +3,15 @@ const { sortBy } = require('lodash');
 const { getDirectories, cleanFileIDs, handleErr } = require('./utils');
 
 var TYPES = {
-  Icons: 'icons',
-  Sprays: 'sprays'
+  Portrait: 'icons',
+  Spray: 'sprays'
 };
 
 const mapAllClassData = () => {
   const cwd = process.cwd();
   const isGeneral = cwd.match(/OverwatchAssets\\General$/);
   if (!cwd.match(/OverwatchAssets$/) && !isGeneral) {
-    console.error("Needs to be run in OverwatchAssets or OverwatchAssets\General");
+    console.error("Needs to be run in OverwatchAssets or OverwatchAssets\\General");
     process.exit();
   }
 
@@ -23,10 +23,11 @@ const mapAllClassData = () => {
   const base = `./${isGeneral ? '' : 'General/'}`;
   getDirectories(base).then(types => {
     Promise.all(types.map(type => {
-      if (type !== 'Icons' && type !== 'Sprays') return Promise.resolve();
+      if (type !== 'Portrait' && type !== 'Spray') return Promise.resolve();
       return getDirectories(`${base}${type}`).then(groups => {
         return Promise.all(groups.map(group => {
           return getDirectories(`${base}${type}/${group}`).then(files => {
+            files = files.filter(x => !fs.statSync(`${base}${type}/${group}/${x}`).isDirectory())
             files = cleanFileIDs(files);
             return Promise.all(files.map(({ name, cleanName }) => {
               data[TYPES[type]].push({ name: name.slice(0, -4), id: cleanName });

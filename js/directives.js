@@ -4,11 +4,9 @@ var types = {
   'icon': '/icon.png'
 };
 
-var oldEvents = ['SUMMER_GAMES_2016', 'HALLOWEEN_2016', 'WINTER_WONDERLAND_2016']
-
 OWI.filter('heroImg', ['UrlService', function(UrlService) {
   return function(hero, type) {
-    return hero == 'all' 
+    return hero === 'all'
       ? UrlService.get('/logo.svg')
       : UrlService.get('/heroes/' + hero + types[type]);
   };
@@ -16,39 +14,34 @@ OWI.filter('heroImg', ['UrlService', function(UrlService) {
 
 OWI.filter('eventImageUrl', ['UrlService', function(UrlService) {
   return function(event) {
-    return  UrlService.get('/updates/' + event + '/logo.png');
+    return UrlService.get('/updates/' + event + '/logo.png');
   };
 }]);
 
-
-OWI.filter('itemPrice', function() {
+OWI.filter('itemPrice', ['DataService', function(DataService) {
   return function(item, type, event) {
-    var isEvent = (item.event || event) && !oldEvents.includes(item.group);
+    var isNewEventItem = (item.event || event) && DataService.latest_events[item.event || event] === item.group;
     var quality = item.quality;
-    if (item.standardItem || item.achievement || type == 'icons') return '';
+    if (item.standardItem || item.achievement || type === 'icons') return '';
 
     var prices = { common: 25, rare: 75, epic: 250, legendary: 1000 };
 
     if (quality && prices[quality]) {
-      return '(' + prices[quality] * (isEvent ? 3 : 1) + ')';
+      return prices[quality] * (isNewEventItem ? 3 : 1);
     }
     return '';
   };
-});
+}]);
 
 OWI.directive('fancyLoad', ["$timeout", function($timeout) {
   return {
     restrict: 'A',
     link: function($scope, $elm, $attr) {
-      $timeout(function() {
-        $elm.addClass('show');
-      }, $attr.fancyLoad * 8);
-
       $elm.on('click', function() {
         $elm.addClass('pulse');
-        $timeout(function() {
+        setTimeout(function() {
           $elm.removeClass('pulse');
-        }, 50);
+        }, 80);
       });
     }
   };
@@ -65,10 +58,7 @@ OWI.directive('sectionHeader', function() {
       totals: '=',
       selectModal: '='
     },
-    templateUrl: './templates/section-header.html',
-    link: function($scope) {
-      console.log($scope)
-    }
+    templateUrl: './templates/section-header.html'
   };
 });
 
@@ -93,13 +83,13 @@ OWI.directive('tooltipImagePreview', ["StorageService", "UrlService", function(S
       var url2 = UrlService.get(item.secondUrl)
 
       var out = { description: item.description };
-      if (type == 'intros' || type == 'emotes') {
+      if (type === 'intros' || type === 'emotes') {
         if (StorageService.getSetting('hdVideos')) {
           out.video = url.replace('.webm', '-hd.webm');
         } else {
           out.video = url;
         }
-      } else if (type == 'voicelines') {
+      } else if (type === 'voicelines') {
         out.audio = url;
       } else {
         out.img = url;
@@ -136,18 +126,28 @@ OWI.directive('subHeader', function() {
   };
 });
 
-OWI.directive('heroNav', function() {
+OWI.directive('heroNav', ["CostAndTotalService", "DataService", function(CostAndTotalService, DataService) {
   return {
     restrict: 'E',
     replace: true,
     scope: {
-      totals: "=totals",
-      events: "=events",
-      heroes: "=heroes"
+      hideTotals: '=hideTotals'
     },
-    templateUrl: './templates/hero-nav.html'
+    templateUrl: './templates/hero-nav.html',
+    controller: ["$scope", function($scope) {
+      DataService.waitForInitialization().then(function() {
+        $scope.heroes = DataService.heroes;
+        $scope.events = DataService.events;
+      })
+
+      if (!$scope.hideTotals) {
+        CostAndTotalService.waitForInitialization().then(function() {
+          $scope.totals = CostAndTotalService
+        })
+      }
+    }]
   };
-});
+}]);
 
 OWI.directive('lazyAudio', ["$timeout", function($timeout) {
   return {
@@ -183,7 +183,7 @@ OWI.directive('lazyAudio', ["$timeout", function($timeout) {
       }
 
       function onLoad(event) {
-        var duration = event.target.duration == Infinity ? 1.5 : event.target.duration;
+        var duration = event.target.duration === Infinity ? 1.5 : event.target.duration;
         steps = Math.ceil(duration / (refreshInterval / 1000));
         tick();
         audio.play();
@@ -272,9 +272,9 @@ OWI.directive('lazyBackground', ["ImageLoader", "$compile", "$timeout", function
       // Observe the lazy-background attribute so that when it changes it can fetch the new image and fade to it
       $attrs.$observe('lazyBackground', function(newSrc) {
         // Make sure newSrc is valid else return error
-        if (newSrc == null || newSrc == "") {
+        if (newSrc === null || newSrc === "") {
           $element.css('background-image', '');
-          //$element.addClass('img-load-error');
+          // $element.addClass('img-load-error');
           return;
         }
 
@@ -288,7 +288,7 @@ OWI.directive('lazyBackground', ["ImageLoader", "$compile", "$timeout", function
         } else {
           loader = { remove: angular.noop };
         }
-        
+
         ImageLoader.loadImage(encodeURI(newSrc), $scope.noLoader).then(function(src) {
           $element.css('background-image', 'url("' + src + '")');
           loader.remove();
@@ -303,7 +303,80 @@ OWI.directive('lazyBackground', ["ImageLoader", "$compile", "$timeout", function
   };
 }]);
 
-OWI.directive("particles", function() {
+OWI.directive('homeProgressBars', ["CostAndTotalService", function(CostAndTotalService) {
+  return {
+    restrict: 'E',
+    templateUrl: './templates/home-progress-bars.html',
+    scope: {},
+    controller: ['$scope', function($scope) {
+      $scope.isCollapsed = true;
+      $scope.selected = 0;
+      $scope.total = 0;
+
+      $scope.qualities = {
+        common: 0,
+        rare: 0,
+        epic: 0,
+        legendary: 0,
+        golden: 0
+      }
+
+      CostAndTotalService.waitForInitialization().then(function() {
+        for (var quality in CostAndTotalService.qualities) {
+          $scope.selected += CostAndTotalService.qualities[quality].selected
+          $scope.total += CostAndTotalService.qualities[quality].total
+        }
+
+        $scope.qualities = {
+          common: CostAndTotalService.qualities.common,
+          rare: CostAndTotalService.qualities.rare,
+          epic: CostAndTotalService.qualities.epic,
+          legendary: CostAndTotalService.qualities.legendary,
+          golden: CostAndTotalService.qualities.golden
+        }
+      })
+    }]
+  }
+}])
+
+OWI.directive('lazyLoad', [function() {
+  return {
+    scope: {},
+    restrict: 'A',
+    link: function($scope, $element, $attrs) {
+      var _initialized = false;
+
+      $attrs.$observe('lazyLoad', function(imgSrc) {
+        if (imgSrc === null || imgSrc === "") {
+          $element.css('background-image', '');
+          return;
+        }
+
+        // If browser doesn't support it just load the image, I can't be bothered polyfilling.
+        if (!('IntersectionObserver' in window)) {
+          $element.css('background-image', 'url("' + imgSrc + '")');
+          return;
+        }
+
+        var elm = angular.element($element)[0];
+        var observer = new IntersectionObserver(function(changes) {
+          for (var change of changes) {
+            if (change.intersectionRatio > 0 || (change.intersectionRatio > 0 && _initialized)) {
+              $element.css('background-image', 'url("' + imgSrc + '")');
+              observer.unobserve(elm);
+            }
+          }
+
+          _initialized = true
+        });
+
+        observer.observe(elm);
+      });
+    }
+  }
+}])
+
+/* OWI.directive("particles", function() {
   return {
     restrict: 'E',
     scope: {},
@@ -364,4 +437,4 @@ OWI.directive("particles", function() {
       })
     }
   }
-})
+}) */

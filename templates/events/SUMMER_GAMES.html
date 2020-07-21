@@ -1,12 +1,14 @@
-<div class="event-progress">
-  <div class="event-progress-bar progress-bar active" style="width: {{totals.overall.percentage}}%;" ng-class="{'progress-bar-striped': totals.overall.selected === totals.overall.total}"></div>
-  <span>{{totals.overall.selected}} / {{totals.overall.total}}  Unlocks</span>
+<div id="event-header">
+  <div class="event-progress">
+    <div class="event-progress-bar progress-bar active" style="width: {{(totals.overall.selected / totals.overall.total) * 100}}%;" ng-class="{'progress-bar-striped': totals.overall.selected === totals.overall.total}"></div>
+    <span>{{totals.overall.selected}} / {{totals.overall.total}}  Unlocks</span>
+  </div>
 </div>
 <div class="col-md-8 col-padding">
   <legendary-skins></legendary-skins>
   <div id="voicelines" class="section">
     <section-header select-modal="selectModal" name="Voicelines" type="voicelines" totals="totals.voicelines"></section-header>
-    <div class="items flex-3">
+    <div class="section-content items flex-3">
       <div
         ng-repeat="item in ::data.items.voicelines track by $index"
         ng-init="type = 'voicelines'"
@@ -19,14 +21,15 @@
         <input type="checkbox" id="{{type + item.id + $index}}" ng-model="checked[item.hero][type][item.id]" ng-change="onSelect(item, type)">
         <label for="{{type + item.id + $index}}">
           <h4 ng-if="::item.heroName">{{::item.heroName}}</h4>
-          <h3 class="{{::item.quality}}">{{::item.name}} <small class="color-cost">{{ ::item | itemPrice:type:true }}</small></h3>
+          <h3 class="{{::item.quality}}">{{::item.name}} <small class="color-cost">{{ ::item | itemPrice:type:'SUMMER_GAMES' }}</small></h3>
+          <span ng-if="item.isNew" class="new">NEW</span>
         </label>
       </div>
     </div>
   </div>
   <div id="icons" class="section">
     <section-header select-modal="selectModal" name="Player Icons" type="icons" totals="totals.icons"></section-header>
-    <div class="items flex-4">
+    <div class="section-content items flex-4">
       <div
         ng-repeat="item in ::data.items.icons track by $index"
         ng-init="type = 'icons'"
@@ -39,7 +42,8 @@
         <input type="checkbox" id="{{type + item.id + $index}}" ng-model="checked[item.hero][type][item.id]" ng-change="onSelect(item, type)">
         <label for="{{type + item.id + $index}}">
           <h4>{{::item.heroName || 'All'}}</h4>
-          <h3 class="{{::item.quality || 'common'}}">{{::item.name}} <small class="color-cost">{{ ::item | itemPrice:type:true }}</small></h3>
+          <h3 class="{{::item.quality || 'common'}}">{{::item.name}} <small class="color-cost">{{ ::item | itemPrice:type:'SUMMER_GAMES' }}</small></h3>
+          <span ng-if="item.isNew" class="new">NEW</span>
         </label>
       </div>
     </div>
@@ -48,11 +52,12 @@
 
 <div class="col-md-4 col-padding">
   <div id="skins" class="section">
-    <section-header select-modal="selectModal" name="Summer Games 2016 Skins" type="skins" totals="totals.skins"></section-header>
-    <div class="items flex-2">
+    <section-header select-modal="selectModal" name="Skins" type="skins" totals="totals.skins"></section-header>
+    <div class="section-content items flex-2">
       <div
         ng-repeat="item in ::data.items.skins track by $index"
         ng-init="type = 'skins'"
+        achievement="{{::item.achievement}}"
         class="item"
         uib-tooltip-template="'imagePreviewTemplate.html'"
         tooltip-popup-delay="225"
@@ -62,14 +67,15 @@
         <input type="checkbox" id="{{type + item.id + $index}}" ng-model="checked[item.hero][type][item.id]" ng-change="onSelect(item, type)">
         <label for="{{type + item.id + $index}}">
           <h4 ng-if="::item.heroName">{{::item.heroName}}</h4>
-          <h3 class="{{::item.quality}}">{{::item.name}} <small class="color-cost">{{ ::item | itemPrice:type:true }}</small></h3>
+          <h3 class="{{::item.quality}}">{{::item.name}} <small class="color-cost">{{ ::item | itemPrice:type:'SUMMER_GAMES' }}</small></h3>
+          <span ng-if="item.isNew" class="new">NEW</span>
         </label>
       </div>
     </div>
   </div>
   <div id="victoryposes" class="section">
     <section-header select-modal="selectModal" name="Victory Poses" type="poses" totals="totals.poses"></section-header>
-    <div class="items flex-2">
+    <div class="section-content items flex-2">
       <div
         ng-repeat="item in ::data.items.poses track by $index"
         ng-init="type = 'poses'"
@@ -82,14 +88,15 @@
         <input type="checkbox" id="{{type + item.id + $index}}" ng-model="checked[item.hero][type][item.id]" ng-change="onSelect(item, type)">
         <label for="{{type + item.id + $index}}">
           <h4 ng-if="::item.heroName">{{::item.heroName}}</h4>
-          <h3 class="{{::item.quality}}">{{::item.name}} <small class="color-cost">{{ ::item | itemPrice:type:true }}</small></h3>
+          <h3 class="{{::item.quality}}">{{::item.name}} <small class="color-cost">{{ ::item | itemPrice:type:'SUMMER_GAMES' }}</small></h3>
+          <span ng-if="item.isNew" class="new">NEW</span>
         </label>
       </div>
     </div>
   </div>
   <div id="emotes" class="section">
     <section-header select-modal="selectModal" name="Emotes" type="emotes" totals="totals.emotes"></section-header>
-    <div class="items flex-2">
+    <div class="section-content items flex-2">
       <div
         ng-repeat="item in ::data.items.emotes track by $index"
         ng-init="type = 'emotes'"
@@ -102,14 +109,15 @@
         <input type="checkbox" id="{{type + item.id + $index}}" ng-model="checked[item.hero][type][item.id]" ng-change="onSelect(item, type)">
         <label for="{{type + item.id + $index}}">
           <h4 ng-if="::item.heroName">{{::item.heroName}}</h4>
-          <h3 class="{{::item.quality}}">{{::item.name}} <small class="color-cost">{{ ::item | itemPrice:type:true }}</small></h3>
+          <h3 class="{{::item.quality}}">{{::item.name}} <small class="color-cost">{{ ::item | itemPrice:type:'SUMMER_GAMES' }}</small></h3>
+          <span ng-if="item.isNew" class="new">NEW</span>
         </label>
       </div>
     </div>
   </div>
     <div id="intros" class="section">
     <section-header select-modal="selectModal" name="Highlight Intros" type="intros" totals="totals.intros"></section-header>
-    <div class="items flex-2">
+    <div class="section-content items flex-2">
       <div
         ng-repeat="item in ::data.items.intros track by $index"
         ng-init="type = 'intros'"
@@ -122,14 +130,15 @@
         <input type="checkbox" id="{{type + item.id + $index}}" ng-model="checked[item.hero][type][item.id]" ng-change="onSelect(item, type)">
         <label for="{{type + item.id + $index}}">
           <h4 ng-if="::item.heroName">{{::item.heroName}}</h4>
-          <h3 class="{{::item.quality}}">{{::item.name}} <small class="color-cost">{{ ::item | itemPrice:type:true }}</small></h3>
+          <h3 class="{{::item.quality}}">{{::item.name}} <small class="color-cost">{{ ::item | itemPrice:type:'SUMMER_GAMES' }}</small></h3>
+          <span ng-if="item.isNew" class="new">NEW</span>
         </label>
       </div>
     </div>
   </div>
   <div id="sprays" class="section">
     <section-header select-modal="selectModal" name="Sprays" type="sprays" totals="totals.sprays"></section-header>
-    <div class="items flex-2">
+    <div class="section-content items flex-2">
       <div
         ng-repeat="item in ::data.items.sprays track by $index"
         ng-init="type = 'sprays'"
@@ -143,7 +152,8 @@
         <input type="checkbox" id="{{type + item.id + $index}}" ng-model="checked[item.hero][type][item.id]" ng-change="onSelect(item, type)">
         <label for="{{type + item.id + $index}}">
           <h4>{{::item.heroName || 'All'}}</h4>
-          <h3 class="{{::item.quality || 'common'}}">{{::item.name}} <small class="color-cost">{{ ::item | itemPrice:type:true }}</small></h3>
+          <h3 class="{{::item.quality || 'common'}}">{{::item.name}} <small class="color-cost">{{ ::item | itemPrice:type:'SUMMER_GAMES' }}</small></h3>
+          <span ng-if="item.isNew" class="new">NEW</span>
         </label>
       </div>
     </div>

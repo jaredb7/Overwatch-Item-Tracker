@@ -1,4 +1,4 @@
-OWI.controller('MainCtrl', ["$rootScope", "$q", "$document", "$uibModal", "DataService", "CompatibilityService", "CostAndTotalService", "UrlService", "StorageService", function($rootScope, $q, $document, $uibModal, DataService, CompatibilityService, CostAndTotalService, UrlService, StorageService) {
+OWI.controller('MainCtrl', ["$q", "$document", "$uibModal", "$transitions", "DataService", "CompatibilityService", "CostAndTotalService", "UrlService", "StorageService", function($q, $document, $uibModal, $transitions, DataService, CompatibilityService, CostAndTotalService, UrlService, StorageService) {
   var vm = this;
   vm.preview = false;
   vm.currentDate = Date.now();
@@ -23,36 +23,37 @@ OWI.controller('MainCtrl', ["$rootScope", "$q", "$document", "$uibModal", "DataS
       remaining: 0,
       selected: 0
     };
+
     for (var hero in CostAndTotalService.heroes) {
       out.remaining += CostAndTotalService.heroes[hero].cost.remaining;
       out.total += CostAndTotalService.heroes[hero].cost.total;
       out.selected += CostAndTotalService.heroes[hero].cost.selected;
     }
+
     return out;
   };
 
-  $rootScope.$on('$stateChangeSuccess', function(event, toState, toParams) {
-    onStateChange(event, toState, toParams);
-  });
-
-  function onStateChange(event, toState, toParams) {
+  $transitions.onSuccess({}, function(transition) {
     vm.showNav = false;
-    var heroOrEventID = toParams.id;
+
+    var route = transition.to().name
+    var heroOrEventID = transition.params().id
+
     if (!heroOrEventID) {
       vm.item = { name: 'Home' };
     } else {
-      DataService.getHeroOrEventName(toState.name, heroOrEventID).then(function(data) {
+      DataService.getHeroOrEventName(route, heroOrEventID).then(function(data) {
         vm.item = data;
       });
     }
-  }
+  })
 
   // Fired when the sidebar is open on every click, checks if a click was made
   // outside the sidebar and if it was, close the sidebar
   var documentClicked = function(event) {
     if (event && event.path) {
       $q.all(event.path.map(function(elm) {
-        if (elm.id == 'sidebar') return $q.resolve(true);
+        if (elm.id === 'sidebar') return $q.resolve(true);
         $q.resolve(false);
       })).then(function(matches) {
         var clickedSidebar = matches.filter(Boolean)[0];
@@ -70,6 +71,7 @@ OWI.controller('MainCtrl', ["$rootScope", "$q", "$document", "$uibModal", "DataS
       $document.off('click', documentClicked);
       return;
     }
+
     if (vm.showSidebar) {
       setTimeout(function () {
         $document.on('click', documentClicked);
@@ -106,9 +108,14 @@ OWI.controller('MainCtrl', ["$rootScope", "$q", "$document", "$uibModal", "DataS
   };
 }]);
 
-OWI.controller('HeroesCtrl', ["$scope", "$state", "$timeout", "$stateParams", "$rootScope", "$uibModal", "DataService", "StorageService", "CompatibilityService", "CostAndTotalService",  function($scope, $state, $timeout, $stateParams, $rootScope, $uibModal, Data, StorageService, CompatibilityService, CostAndTotalService) {
+var savedFilters = null
+
+OWI.controller('HeroesCtrl', ["$scope", "$state", "$timeout", "$stateParams", "$rootScope", "$uibModal", "DataService", "StorageService", "CompatibilityService", "CostAndTotalService", function($scope, $state, $timeout, $stateParams, $rootScope, $uibModal, Data, StorageService, CompatibilityService, CostAndTotalService) {
   var vm = this;
   vm.loaded = false;
+  vm.hasGroups = true
+  vm.hasEvents = true
+  vm.noFilteredLayout = false
   var hero;
 
   Data.waitForInitialization().then(function(data) {
@@ -117,40 +124,66 @@ OWI.controller('HeroesCtrl', ["$scope", "$state", "$timeout", "$stateParams", "$
       $state.go('home');
       return;
     }
+
     Object.assign(vm, hero);
+
     init();
+
     $timeout(function() {
       vm.loaded = true;
+
+      if (savedFilters) {
+        vm.updateFilters()
+      }
     }, 0);
   });
+
+  var hasGroups = function() {
+    if (!vm.groups) return false
+
+    return Object.keys(vm.groups).length;
+  };
+
+  var hasEvents = function() {
+    if (!vm.events) return false;
+
+    return Object.keys(vm.events).length;
+  };
 
   function init() {
     vm.filteredItems = hero.items;
     vm.canPlayType = CompatibilityService.canPlayType;
     vm.gridView = false;
     vm.checked = Data.checked;
-    
+
     CostAndTotalService.waitForInitialization().then(function(data) {
       vm.events = data.heroes[hero.id].events;
       vm.groups = data.heroes[hero.id].groups;
       vm.totals = data.heroes[hero.id].totals;
+      vm.hasEvents = hasEvents();
+      vm.hasGroups = hasGroups();
 
       // Cost is on scope as it is a directive in the page and it inherits parent scope
       $scope.cost = CostAndTotalService.heroes && CostAndTotalService.heroes[hero.id] ? CostAndTotalService.heroes[hero.id].cost : 0;
     });
   }
-  
-  vm.filters = {
-    selected: false,
-    unselected: false,
-    achievement: false,
-    hero: false,
-    events: {},
-    groups: {}
-  };
+
+  vm.filters = $stateParams.id !== 'all' && savedFilters
+    ? savedFilters
+    : {
+      selected: false,
+      unselected: false,
+      achievement: false,
+      hero: false,
+      noevent: false,
+      events: {},
+      groups: {}
+    };
 
   // Returns if an item is checked, use item.hero if one is available as allClass Icons includes icons from all heroes
   vm.isItemChecked = function(item, type) {
+    if (item.standardItem) return true
+
     return vm.checked[item.hero || hero.id][type][item.id];
   };
 
@@ -165,16 +198,6 @@ OWI.controller('HeroesCtrl', ["$scope", "$state", "$timeout", "$stateParams", "$
       default:
         return name;
     }
-  };
-
-  vm.hasGroups = function() {
-    if (!vm.groups) return false;
-    return Object.keys(vm.groups).length;
-  };
-
-  vm.hasEvents = function() {
-    if (!vm.events) return false;
-    return Object.keys(vm.events).length;
   };
 
   var resetCosts = function() {
@@ -195,6 +218,7 @@ OWI.controller('HeroesCtrl', ["$scope", "$state", "$timeout", "$stateParams", "$
     var selected = vm.filters.selected;
     var unselected = vm.filters.unselected;
     var achievement = vm.filters.achievement;
+    var regularItems = vm.filters.regularItems;
     var herof = vm.filters.hero;
 
     // Generate array of event ids we are filtering
@@ -209,11 +233,11 @@ OWI.controller('HeroesCtrl', ["$scope", "$state", "$timeout", "$stateParams", "$
     }
 
     // Disable filtering if nothing is selected
-    if (!eventFilters.length && !groupFilter.length && !selected && !unselected && !achievement && !herof) {
+    if (!eventFilters.length && !groupFilter.length && !selected && !unselected && !achievement && !herof && !regularItems) {
       vm.clearFilters();
       return;
     }
-    
+
     vm.filteredItems = filterItems(hero.items, eventFilters, groupFilter);
     updateCosts();
 
@@ -222,44 +246,62 @@ OWI.controller('HeroesCtrl', ["$scope", "$state", "$timeout", "$stateParams", "$
     currentFilters = currentFilters.map(function(e) {
       return Data.events[e].name;
     });
+
     currentFilters = currentFilters.concat(groupFilter);
+
+    if (regularItems) {
+      currentFilters.push('REGULAR ITEMS')
+    }
+
     if (achievement) {
       currentFilters.push('ACHIEVEMENT');
     }
+
     if (herof) {
       currentFilters.push('HERO');
     }
+
     if (selected || unselected) {
-      currentFilters.push(selected ? 'SELECTED' : unselected ? 'UNSELECTED': '');
+      currentFilters.push(selected ? 'SELECTED' : unselected ? 'UNSELECTED' : '');
     }
+
     vm.currentFilters = currentFilters.join('|');
   };
 
   // Filters the items and returms new data object
   function filterItems(items, eventFilters, groupFilter) {
     var out = {};
+    var itemCount = 0;
+    var typeCount = 0;
+
     for (var type in items) {
       var outType = [];
       items[type].forEach(function(item) {
         if (vm.filters.selected || vm.filters.unselected) {
           var checked = vm.isItemChecked(item, type);
-          if ((vm.filters.selected && !checked && !item.standardItem) || (vm.filters.unselected && (checked || item.standardItem)))  return;
+          if ((vm.filters.selected && !checked && !item.standardItem) || (vm.filters.unselected && (checked || item.standardItem))) return;
         }
 
+        if (vm.filters.regularItems && (item.event || item.achievement)) return;
         if (vm.filters.achievement && !item.achievement) return;
         if (vm.filters.hero && !item.hero) return;
         if (eventFilters.length && (!item.event || !eventFilters.includes(item.event))) return;
         if (groupFilter.length && (!item.group || !groupFilter.includes(item.group))) return;
 
+        itemCount++;
         outType.push(item);
       });
+
       if (outType.length) {
+        typeCount++;
         out[type] = outType;
       }
     }
+
+    vm.noFilteredLayout = itemCount > 35 && typeCount > 2
     return out;
   }
-  
+
   vm.clearFilters = function() {
     vm.filters = {
       selected: false,
@@ -269,50 +311,61 @@ OWI.controller('HeroesCtrl', ["$scope", "$state", "$timeout", "$stateParams", "$
       events: {},
       groups: {}
     };
+
+    savedFilters = null;
     vm.currentFilters = '';
     vm.filtering = false;
     vm.filteredItems = hero.items;
     resetCosts();
   };
 
+  vm.saveFilters = function() {
+    savedFilters = vm.filters;
+  }
+
   // Manual function to select an item, used in grid mode
   vm.selectItem = function(item, type) {
     if (item.standardItem) return;
+
     vm.checked[item.hero || hero.id][type][item.id] = !vm.checked[item.hero || hero.id][type][item.id];
     vm.onSelect(item, type);
   };
 
   vm.onSelect = function(item, type) {
     StorageService.setData(Object.assign({}, Data.checked, vm.checked));
-    if (vm.filtering) {
-      CostAndTotalService.updateItem(item, type, hero.id);
-      updateCosts();
-      return;
-    }
     CostAndTotalService.updateItem(item, type, hero.id);
+
+    if (vm.filtering) {
+      updateCosts();
+    }
   };
 
   vm.toggleGrid = function() {
-    if (hero.id != 'all') return;
+    if (hero.id !== 'all') return;
     vm.gridView = !vm.gridView;
   };
 
   // Mark all items for current hero as selected
   vm.selectAll = function(unselect, onlyType) {
-    if (vm.totals.overall.selected == vm.totals.overall.total && !unselect) {
+    if (vm.totals.overall.selected === vm.totals.overall.total && !unselect) {
       return;
     }
+
     for (var type in vm.filteredItems) {
       if (onlyType && type !== onlyType) {
         continue;
       }
+
       vm.filteredItems[type].forEach(function(item) {
         if (item.standardItem) return;
-        vm.checked[item.hero || hero.id][type][item.id] = (unselect ? false : true);
+
+        vm.checked[item.hero || hero.id][type][item.id] = !unselect;
       });
     }
+
     StorageService.setData(Object.assign({}, Data.checked, vm.checked));
     CostAndTotalService.recalculate();
+
     if (vm.filtering) {
       updateCosts();
     } else {
@@ -321,16 +374,18 @@ OWI.controller('HeroesCtrl', ["$scope", "$state", "$timeout", "$stateParams", "$
   };
 
   vm.selectModal = function(type, str) {
-    if (vm.totals.overall.selected == 0 && str == 'unselect') return;
+    if (vm.totals.overall.selected === 0 && str === 'unselect') return;
+
     var modal = $uibModal.open({
       templateUrl: './templates/modals/select.html',
       controller: function($scope) {
         $scope.message = ('Are you sure you want to ' + str + ' all ' + (type || 'items'));
       }
     });
+
     modal.result.then(function(goahead) {
       if (goahead) {
-        if (str == 'select') {
+        if (str === 'select') {
           vm.selectAll(false, type);
         } else {
           vm.selectAll(true, type);
@@ -372,16 +427,17 @@ OWI.controller("UpdateCtrl", ["$scope", "$rootScope", "$uibModal", "DataService"
   };
 
   $scope.selectModal = function(type, str) {
-    if ($scope.totals.overall.selected == 0 && str == 'unselect') return;
+    if ($scope.totals.overall.selected === 0 && str === 'unselect') return;
     var modal = $uibModal.open({
       templateUrl: './templates/modals/select.html',
       controller: function($scope) {
         $scope.message = ('Are you sure you want to ' + str + ' all ' + (type || 'items'));
       }
     });
+
     modal.result.then(function(goahead) {
       if (goahead) {
-        if (str == 'select') {
+        if (str === 'select') {
           selectAll(false, type);
         } else {
           selectAll(true, type);
@@ -391,16 +447,17 @@ OWI.controller("UpdateCtrl", ["$scope", "$rootScope", "$uibModal", "DataService"
   };
 
   var selectAll = function(unselect, onlyType) {
-    if ($scope.totals.overall.selected == $scope.totals.overall.total && !unselect) {
+    if ($scope.totals.overall.selected === $scope.totals.overall.total && !unselect) {
       return;
     }
+
     for (var type in event.items) {
       if (onlyType && type !== onlyType) {
         continue;
       }
 
       for (var item of event.items[type]) {
-        $scope.checked[item.hero || 'all'][type][item.id] = (unselect ? false : true);
+        $scope.checked[item.hero || 'all'][type][item.id] = !unselect;
       }
     }
 
@@ -450,7 +507,7 @@ OWI.controller('SettingsCtrl', ["$rootScope", "$scope", "$uibModal", "$uibModalI
   }
 
   vm.downloadJSON = function() {
-    var url = URL.createObjectURL(new Blob([ JSON.stringify(DataService.checked, null, 2) ],  { type: 'application/json' }));
+    var url = URL.createObjectURL(new Blob([ JSON.stringify(DataService.checked, null, 2) ], { type: 'application/json' }));
     var el = document.createElement('a');
     el.setAttribute('href', url);
     el.setAttribute('download', 'overwatch-item-tracker_backup_' + getDate() + '.json');
@@ -554,7 +611,7 @@ OWI.controller('SettingsCtrl', ["$rootScope", "$scope", "$uibModal", "$uibModalI
       StorageService.setSetting('syncDisabled', true);
     } else {
       vm.syncDisabled = !vm.syncDisabled;
-    }   
+    }
   };
 
   $rootScope.$on('google:login', function(event, data) {
@@ -628,6 +685,7 @@ OWI.controller('SettingsCtrl', ["$rootScope", "$scope", "$uibModal", "$uibModalI
           vm.syncDisabled = false;
           StorageService.setSetting('syncDisabled', false);
         }
+
         vm.googleMessage = ['success', 'Successfully uploaded to Google Drive... maybe... probably...'];
       } else {
         vm.googleMessage = ['danger', 'An error occured while uploading to Google Drive!'];

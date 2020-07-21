@@ -4,7 +4,8 @@
  * Code on this page is synchronous, it works it's way down.
  */
 const fs = require('fs');
-const { forEach, sortBy, find, reduce, merge, get, isEmpty, findKey } = require('lodash');
+const _ = require('lodash');
+const alphaNumSort = require('./dataMapper/alphaNumSort')
 
 const mode = process.argv.slice(2)[0];
 
@@ -23,17 +24,22 @@ const consoleColors = require('./consoleColors');
 consoleColors.load();
 
 const HERODATA = require('./dataMapper/HERODATA.js');
-const { badNames, hiddenItems, defaultItems, achievementSprays, specialItems, blizzardItems, allClassEventItems, itemNamesIFuckedUp, idsBlizzardChanged } = require('./dataMapper/itemData.js');
-const { EVENTS, EVENTNAMES, EVENTTIMES, EVENTORDER, CURRENTEVENT, EVENT_ITEM_ORDER, EVENT_PREVIEWS, NEW_EVENTS } = require('./dataMapper/EVENTDATA.js');
+const {
+  badNames, hiddenItems, defaultItems, achievementSprays, specialItems,
+  specialAchievementItems, blizzardItems, allClassEventItems, itemNamesIFuckedUp,
+  idsBlizzardChanged, noLongerPurchaseableItems, eventItemOverrides, owlTeams
+} = require('./dataMapper/itemData.js');
+const { EVENTS, EVENTNAMES, EVENTTIMES, EVENTORDER, CURRENTEVENT, EVENT_ITEM_ORDER, EVENT_PREVIEWS, LATEST_EVENTS } = require('./dataMapper/EVENTDATA.js');
 const { EVENTITEMS } = require('./dataMapper/EVENTITEMS.js');
-const { getCleanID, getItemType, getPreviewURL, sortObject, qualityOrder, getAchievementForItem } = require('./dataMapper/utils.js');
+const { getCleanID, getItemType, getPreviewURL, sortObject, qualityOrder, getAchievementForItem, getOriginalItemsList } = require('./dataMapper/utils.js');
+const originalData = require('../data/master.json')
 
 var allClassData, missingAllClassData = {}, allClassDataKeys = {};
 var raw = { rawData: '', newRawData: '' };
 try {
   allClassData = require('../data/allClassItems.json');
   raw.rawData = fs.readFileSync(`${__dirname}/rawData.txt`, "utf8");
-  
+
 } catch(e) {
   console.error("Failed to find allClassData or rawData!!");
   process.exit();
@@ -57,7 +63,7 @@ things.forEach((thingy, i) => {
   console.info('Parsing', thingy);
   if (!raw[thingy]) return;
   const itemGroupRegex = /\t(.+)(\n\t{2}.+)*/g;
-  const heroGroups = raw[thingy].replace(/\r\n/g, '\n').split('\n').filter(a => !a.includes("Error unknown")).join('\n').split('\n\n');
+  const heroGroups = raw[thingy].split('\n\n');
 
   heroGroups.forEach(heroData => {
     if (!heroData.length) return;
@@ -65,17 +71,24 @@ things.forEach((thingy, i) => {
     let rawItems = heroData.split('\n').slice(1).join('\n'); // remove the first line containing name of hero
     var items = {}, itemMatch;
     while ((itemMatch = itemGroupRegex.exec(rawItems)) !== null) { // Regex each group and it's items
-      const groupName = itemMatch[1].replace('Event/', '').split(' ')[0].toUpperCase().replace('STANDARD', 'STANDARD_COMMON').replace('DEFAULT', 'ACHIEVEMENT')
+      const groupName = itemMatch[1]
+        .replace('Unlocks', '')
+        .trim()
+        .replace(/ /g, '_')
+        .toUpperCase()
+        .replace('ARCHIVES', 'UPRISING')
+        .replace('WINTER', 'WINTER_WONDERLAND')
+
       items[groupName] = itemMatch[0].split(/\n\t\t(?!\t)/).slice(1).map(a => a.trim());
     }
-    
+
     // Filter out Uprising bots
-    if (!items.COMMON && i == 0) {
+    if (!items.BASE && i == 0) {
       console.warn(`Skipping ${hero} as it has no items`);
       return;
     }
 
-    if (isEmpty(items)) {
+    if (_.isEmpty(items)) {
       console.warn(`${hero} has no items`);
     }
 
@@ -87,6 +100,12 @@ things.forEach((thingy, i) => {
             console.warn(hero, "doesn't exist in data");
             continue;
           }
+
+          if (!data[hero].items[group]) {
+            data[hero].items[group] = [item]
+            continue
+          }
+
           data[hero].items[group].push(item);
         }
       }
@@ -99,9 +118,9 @@ things.forEach((thingy, i) => {
 // AllClassData that isn't automatically generated can be manually added in missingAllClassData.json
 // parsing missing items and if they have a name, add them to an object similar to allClassData
 console.info('Parsing missingAllClassData');
-var noLongerMissingAllClassData = reduce(missingAllClassData, (result, items, type) => {
+var noLongerMissingAllClassData = _.reduce(missingAllClassData, (result, items, type) => {
   if (!result[type]) result[type] = [];
-  items = reduce(items, (newItems = [], item) => {
+  items = _.reduce(items, (newItems = [], item) => {
     if (item.name.length) newItems.push(item);
     return newItems;
   }, []);
@@ -110,68 +129,112 @@ var noLongerMissingAllClassData = reduce(missingAllClassData, (result, items, ty
 }, {});
 
 // Add no longer missing allclass data onto allClassData
-forEach(noLongerMissingAllClassData, (items, type) => allClassData[type] = [...allClassData[type], ...items]);
+_.forEach(noLongerMissingAllClassData, (items, type) => allClassData[type] = [...allClassData[type], ...items]);
+
+var thanksBlizz = {}
 
 // Create object containing allclass item names by key so we can easily map event ids to items.
 // also check if any items are in allClassEventItems and mark them as event items
 console.info('Generating allClass data');
-allClassData = reduce(allClassData, (result, items, type) => {
+allClassData = _.reduce(allClassData, (result, items, type) => {
   let idCache = {};
   if (!result[type]) {
     result[type] = [];
     allClassDataKeys[type] = {};
   }
 
-  items = reduce(items, (newItems = [], item) => {
+  items = _.reduce(items, (newItems = [], item) => {
     if (hiddenItems[type] && hiddenItems[type].includes(item.id)) return newItems;
+
     item.name = itemNamesIFuckedUp[`${type}/${item.id}`] || item.name;
     item.id = idsBlizzardChanged[`${type}/${item.id}`] || item.id;
     allClassDataKeys[type][item.id] = item.name;
-    var { event = undefined } = reduce(allClassEventItems[type], (r, items, eventID) => {
-      let match = find(items, id => id == item.id);
+
+    var { event = undefined } = _.reduce(allClassEventItems[type], (r, items, eventID) => {
+      let match = _.find(items, id => id == item.id);
       Object.assign(r, match ? { event: eventID } : {});
       return r;
     }, {});
 
-    if (idCache[item.id]) console.warn("Duplicate allClassData detected", item.id);
+    if (idCache[item.id]) {
+      console.warn("Duplicate allClassData detected", item.id);
+      item.id += '-1'
+    }
     idCache[item.id] = true;
 
     // Check if the spray or icon is a Competitive reward
-    const isSeasonCompItem = item.id.match(/^season-(.)-(competitor|hero)$/);
-    const isCompItem =  isSeasonCompItem || item.id.match(/^(top-500|copa-lucioball-\w+)$/) ? { group: 'competitive' } : undefined;
-    const isPachiItem = item.id.startsWith('pachi') || item.id.endsWith('mari') ? { group: 'pachi' } : undefined;
-    const isStandard = defaultItems[type].includes(item.id) ? { standardItem: true } : undefined;
-    const isAchievement = ((type == 'sprays' && achievementSprays.includes(item.id)) || isCompItem) ? { achievement: true } : blizzardItems[type].includes(item.id) ? { achievement: 'blizzard' } : undefined;
-    
+    const isSeasonCompItem = item.id.match(/^season-(\d+)-(competitor|hero)$/);
+    const isOtherCompItem = item.id.match(/^(top-500|(copa-lucioball|competitive-ctf|competitive-(6v6|3v3)-(group-)?elimination|competitive-(team-)?deathmatch|competitive-open-queue)-\w+(-\d+)?)$/)
+    const isCompItem =  isSeasonCompItem || isOtherCompItem ? { group: 'competitive' } : undefined;
+    const isOWLItem = item.id.match(/^(inaugural-season)$/)
+    const isPachiItem = item.id.includes('pachi') || item.id.endsWith('mari') ? { group: 'pachi' } : undefined;
+    let isStandard = defaultItems[type].includes(item.id) ? { standardItem: true } : undefined;
+    let isAchievement = ((type == 'sprays' && achievementSprays.includes(item.id)) || isCompItem)
+      ? { achievement: true }
+      : blizzardItems[type].includes(item.id)
+        ? { achievement: 'blizzard' }
+        : isOWLItem
+          ? { achievement: 'owl' }
+          : undefined;
+
+    var group = undefined;
+
+    const owlTeamName = item.id.replace(/(-\d{4}-logo|-logo|-\d{4})$/, '')
+    if (owlTeams.includes(owlTeamName)) {
+      isStandard = { standardItem: true }
+      group = { group: 'overwatch league' }
+    }
+
+    const owlTeamName2 = item.id.replace(/(-homestand-\d{4})$/, '')
+    if (owlTeams.includes(owlTeamName2)) {
+      isAchievement = { achievement: 'owl' }
+      group = { group: 'overwatch league' }
+    }
+
     // Only purchasable items need a quality
-    const quality = (type == 'sprays' && !isStandard && !isAchievement && !isCompItem) ? { quality: 'common' } : undefined;
+    const isNoLongerPurchasble = noLongerPurchaseableItems[type] && noLongerPurchaseableItems[type].includes(item.id)
+    const quality = (type == 'sprays' && !isStandard && !isAchievement && !isCompItem && !isNoLongerPurchasble) ? { quality: 'common' } : undefined;
     const url = getPreviewURL(type, item.id, 'all');
 
     // Check if we have an achievement description for an achievement
     let description;
-    if (isAchievement) {
-      const desc = getAchievementForItem(item.id);
-      if (desc) {
-        description = { description: desc };
+    const desc = getAchievementForItem(item.id);
+
+    if (desc && (type !== 'icons' || (type === 'icons' && !event) || (type === 'icons' && event && _.get(allClassEventItems, [type, event], []).includes(item.id)))) {
+      description = { description: desc };
+    }
+
+    // Check for specific item groups
+    if (!group) {
+      for (let g in specialItems) {
+        if (specialItems[g][type] && specialItems[g][type].includes(item.id)) {
+          group = { group: g };
+        }
       }
     }
-    
-    // Check for specific item groups
-    var group = undefined;
-    for (let g in specialItems) {
-      if (specialItems[g][type] && specialItems[g][type].includes(item.id)) group = { group: group };
+
+    if (group && group.group === 'overwatch league') {
+      isAchievement = { achievement: 'owl' }
+    }
+
+    if (type === 'sprays') {
+      const actualEvent = _.findKey(EVENTITEMS[event], e => e.includes(`${type}/${item.id}`));
+      if (actualEvent) {
+        group = { group: actualEvent };
+      }
     }
 
     newItems.push(Object.assign(item, { event, url }, isAchievement, isStandard, quality, group, isPachiItem, isCompItem, description));
+
     if (isSeasonCompItem && type == 'sprays') {
       const id = `season-${isSeasonCompItem[1]}-hero`;
-      const desc2 = getAchievementForItem(item.id);
-      newItems.push(Object.assign({}, { 
-        name: `Season ${isSeasonCompItem[1]} Hero`, 
+      const desc2 = getAchievementForItem(id);
+      newItems.push(Object.assign({}, {
+        name: `Season ${isSeasonCompItem[1]} Hero`,
         id: id,
         url: getPreviewURL(type, id, 'all'),
-        achievement: true, 
-        group: 'competitive' 
+        achievement: true,
+        group: 'competitive'
       }, desc2 ? { description: desc2 } : undefined));
     }
     return newItems;
@@ -202,7 +265,7 @@ for (var hero in data) {
     }
   });
 
-  forEach(itemGroups, (items, group) => {
+  _.forEach(itemGroups, (items, group) => {
     items.forEach(item => {
       var [, name, itemType] = item.match(/(.+) \((.+)\)/);
       name = badNames[name.trim()] || name.trim();
@@ -213,34 +276,72 @@ for (var hero in data) {
 
       // Generate ID of the item and check if we need to manually override it.
       var id = getCleanID(name, heroID);
-      id = idsBlizzardChanged[`${type}/${id}`] || id;
-      name = itemNamesIFuckedUp[`${type}/${id}`] || name;
+      const uniqueId = `${type}/${id}`
+
+      // TODO: Remove this shit
+      if (id === 'reinhardt-crusader' && type === 'sprays') {
+        if (thanksBlizz['reinspray1']) {
+          id = 'reinhardt-crusader-1'
+        } else {
+          thanksBlizz['reinspray1'] = true
+        }
+      }
+
+      if (id === 'baptiste-some-kind-of-angel' && type === 'voicelines') {
+        if (thanksBlizz['bapvl1']) {
+          id = 'baptiste-some-kind-of-angel-1'
+        } else {
+          thanksBlizz['bapvl1'] = true
+        }
+      }
+
+      id = idsBlizzardChanged[uniqueId] || id;
+      name = itemNamesIFuckedUp[uniqueId] || name;
 
       const url = getPreviewURL(type, id, heroID);
       const out = { name, id, quality, url };
 
       // Check if item has a description
-      const split = item.split('\n');
-      if (split[1]) {
-        out.description = split[1].trim();
+      const descStr = (item.split('\n')[1] || '').trim();
+      if (descStr.length !== 0) {
+        if (descStr === 'IS_STANDARD') {
+          out.standardItem = true
+        } else if (!descStr.match(/available (in|for)/i)) {
+          out.description = descStr
+        }
       }
 
       switch (group) {
-        case 'COMMON':
+        case 'BASE':
           break;
-        case 'ACHIEVEMENT':
+        case 'OWL':
+          out.achievement = 'owl'
+          return
+        case 'OTHER':
           if (type === 'weapons') {
             out.quality = 'golden'
             break;
           }
 
-          out.achievement = (type == 'sprays' && achievementSprays.includes(name.toLowerCase())) ? true : 'blizzard';
+          var achievementId = id.match(/-(cute|pixel)$/) ? 'cute' : id
+          out.achievement = (type == 'sprays' && achievementSprays.includes(achievementId.toLowerCase())) ? true : 'blizzard';
           var desc = getAchievementForItem(id);
-          if (desc && out.achievement !== 'blizzard') {
+          if (desc) {
             out.description = desc;
           }
+
+          for (let g in specialAchievementItems) {
+            if (specialAchievementItems[g][type] && specialAchievementItems[g][type].includes(id)) {
+              out.achievement = g
+            }
+          }
+
+          if (uniqueId in eventItemOverrides) {
+            out.event = eventItemOverrides[uniqueId]
+            out.achievement = 'limited'
+          }
           break;
-        case 'STANDARD_COMMON':
+        case 'DEFAULT':
           out.standardItem = true;
           break;
         default:
@@ -271,30 +372,25 @@ heroes = sortObject(heroes);
 // Go through every heros items and create a seperate object containing every item added in events
 console.info('Generating event data');
 var updates = {};
-forEach(heroes, hero => {
-  forEach(hero.items, (items, tKey) => {
+_.forEach(heroes, hero => {
+  _.forEach(hero.items, (items, tKey) => {
     items.forEach(item => {
       const event = item.event;
-      const actualEvent = findKey(EVENTITEMS, event => event.includes(`${tKey}/${item.id}`));
+      if (!item.event) return
+
+      const actualEvent = _.findKey(EVENTITEMS[event], event => event.includes(`${tKey}/${item.id}`));
 
       if (actualEvent) {
-        item.group = actualEvent;
+        item.group = actualEvent // we do this because it mutates the original item, super fucking jank but it works
       }
 
-      // If the item to a new event. e.g. ummergames 2017 instead of 2016
-      if (NEW_EVENTS.includes(event) && !actualEvent) {
-        item.isNew = true;
+      // If the item to a new event. e.g. summergames 2017 instead of 2016
+      if (LATEST_EVENTS[event] === actualEvent || !actualEvent) {
+        item.isNew = true // we do this because it mutates the original item, super fucking jank but it works
       }
 
-      let type;
-      if (NEW_EVENTS.includes(event)) {
-        type = (tKey == 'skins' && item.quality == 'legendary' && !actualEvent) ? 'skinsLegendary' : tKey;
-      } else {
-        // Split legendary and epic skins up for events as they are displayed seperately.
-        type = tKey == 'skins' ? (item.quality == 'legendary' ? 'skinsLegendary' : (item.quality == 'epic' ? 'skinsEpic' : 'skins')) : tKey;
-      }
+      const type = (tKey === 'skins' && item.isNew && item.quality == 'legendary') ? 'skinsLegendary' : tKey
 
-      if (!event) return;
       if (!updates[event]) updates[event] = {
         order: EVENTORDER[event],
         name: EVENTNAMES[event],
@@ -302,15 +398,29 @@ forEach(heroes, hero => {
         dates: EVENTTIMES[event],
         items: {}
       };
-      if (!updates[event].items[type]) updates[event].items[type] = [];
+
+      if (!updates[event].items[type]) {
+        updates[event].items[type] = []
+      }
+
       // if the item isnt a skin and is a legendary add a legendary tag, we do this because very few items for events
       // have had legendary items added outside of skins, this way we can mark them as special
       const legend = (tKey != 'skins' && item.quality == 'legendary') ? { legendary: true } : {};
       const url = getPreviewURL(type, item.id, hero.id, event);
-      const newItem = Object.assign({}, { heroName: hero.name, hero: hero.id }, legend, item, { url } );
+
+      const newItem = Object.assign({},
+        { heroName: hero.name, hero: hero.id },
+        legend,
+        item,
+        { url },
+        item.group && { group: item.group },
+        item.isNew && { isNew: true }
+      );
+
       if (type == 'icons') {
         delete newItem.quality;
       }
+
       delete newItem.event;
       updates[event].items[type].push(newItem);
     });
@@ -360,8 +470,8 @@ updates[EVENTS.LUNAR].items.sprays = updates[EVENTS.LUNAR].items.sprays.map(spra
 // Add allClassEventItems items (which aren't detected by item extrator) manually to events
 console.info('Mapping allClassEventItems to events data');
 const missingKeys = [];
-forEach(allClassEventItems, (types, type) => {
-  forEach(types, (events, event) => {
+_.forEach(allClassEventItems, (types, type) => {
+  _.forEach(types, (events, event) => {
     events.forEach(itemID => {
       if (!allClassDataKeys[type][itemID]) {
         console.warn("Missing key for", itemID);
@@ -371,10 +481,6 @@ forEach(allClassEventItems, (types, type) => {
 
       let name = allClassDataKeys[type][itemID];
 
-      if (!NEW_EVENTS.includes(event)) {
-        name = name.replace(/ \d{4}$/, '');
-      }
-
       const out = {
         hero: 'all',
         name: name,
@@ -382,28 +488,38 @@ forEach(allClassEventItems, (types, type) => {
         url: getPreviewURL(type, itemID, 'all', event)
       };
 
-      const actualEvent = findKey(EVENTITEMS, event => event.includes(`${type}/${itemID}`));
-      if (actualEvent && type !== 'icons') {
+      const actualEvent = _.findKey(EVENTITEMS[event], e => e.includes(`${type}/${itemID}`));
+      if (actualEvent) {
         out.group = actualEvent;
       }
 
+      // If the item to a new event. e.g. summergames 2017 instead of 2016
+      if (LATEST_EVENTS[event] === actualEvent) {
+        out.isNew = true;
+      }
 
       const isAchivement = achievementSprays.includes(itemID);
-      if (isAchivement) {
+      if (isAchivement && type === 'sprays') {
         Object.assign(out, { achievement: true });
-        var desc = getAchievementForItem(itemID);
-        if (desc) {
-          Object.assign(out, { description: desc });
-        }
       }
+
+      var desc = getAchievementForItem(itemID);
+      if (desc) {
+        Object.assign(out, { description: desc });
+      }
+
+      const isNoLongerPurchasble = noLongerPurchaseableItems[type] && noLongerPurchaseableItems[type].includes(itemID)
+
       // sprays have no quality by default but if it isn't an achievement it means it's purchaseable so add quality
-      if (type == 'sprays' && !isAchivement) {
+      if (type === 'sprays' && !isAchivement && !isNoLongerPurchasble) {
         Object.assign(out, { quality: 'common' });
       }
+
       if (!updates[event]) {
         console.warn("Missing event!!", event);
         return;
       }
+
       if (!updates[event].items[type]) updates[event].items[type] = [];
       updates[event].items[type].push(out);
     });
@@ -419,7 +535,7 @@ if (missingKeys.length) {
       if (!out[item.type]) out[item.type] = {};
       out[item.type][item.itemID] = { id: item.itemID };
     });
-    missingAllClassData = merge(missingAllClassData, out);
+    missingAllClassData = _.merge(missingAllClassData, out);
     for (var type in missingAllClassData) {
       for (var itemID in missingAllClassData[type]) {
         let item = missingAllClassData[type][itemID];
@@ -434,16 +550,16 @@ if (missingKeys.length) {
 
 // Sort event items by hero, name or name depending on type
 console.info('Sorting event items');
-forEach(updates, update => forEach(update.items, (items, type) => {
+_.forEach(updates, update => _.forEach(update.items, (items, type) => {
   switch (type) {
     case 'icons':
-      update.items[type] = sortBy(items, get(EVENT_ITEM_ORDER, [update.id, type]) || ['name']);
+      update.items[type] = _.sortBy(items, _.get(EVENT_ITEM_ORDER, [update.id, type]) || ['name']);
       break;
     case 'sprays':
-      update.items[type] = sortBy(items, ['heroName', (c => c.achievement ? 1 : 0), 'name']);
+      update.items[type] = _.sortBy(items, ['heroName', (c => c.achievement ? 1 : 0), 'name']);
       break;
     default:
-      update.items[type] = sortBy(items, get(EVENT_ITEM_ORDER, [update.id, type]) || ['heroName', 'name']);
+      update.items[type] = _.sortBy(items, _.get(EVENT_ITEM_ORDER, [update.id, type]) || ['heroName', 'name']);
   }
 }));
 
@@ -460,26 +576,46 @@ heroes["all"] = Object.assign({
 updates = sortObject(updates, true);
 heroes = sortObject(heroes);
 
-// go through all hero items and sort items as they are sorted ingame
+// Go through everything and check old ids vs new ids to detect changes
+const originalItemsMapping = getOriginalItemsList(originalData)
+for (let hero in heroes) {
+  if (!originalItemsMapping[hero]) continue
+  for (let type in heroes[hero].items) {
+    if (!originalItemsMapping[hero][type]) continue
+    for (let item of heroes[hero].items[type]) {
+      if (!originalItemsMapping[hero][type].includes(item.id)) {
+        console.warn(`Changed/New item detected - [${hero}/${type}] ${item.id}`)
+      }
+    }
+  }
+}
+
+// Go through all hero items and sort items as they are sorted in-game
 console.info('Sorting hero items');
-forEach(heroes, hero => forEach(hero.items, (items, type) => {
+_.forEach(heroes, hero => _.forEach(hero.items, (items, type) => {
+  delete hero.sortName
+
   if (hero.id == 'all') {
     if (type == 'sprays') {
-      hero.items[type] = sortBy(items, [
-        (b => EVENTORDER[b.event]), // event items go below normal items
-        (d => d.name.toLowerCase()) // everything in their respective groups is sorted by name
+      hero.items[type] = _.sortBy(alphaNumSort(items), [
+        (b => EVENTORDER[b.event]) // event items go below normal items
       ]);
     } else {
-      hero.items[type] = sortBy(items, [a => a.name.toLowerCase()]); // sort alphabetically
+      hero.items[type] = alphaNumSort(items)
     }
     return;
   }
-  hero.items[type] = sortBy(items, [
-    'standardItem', // Standard items first
-    (a => qualityOrder[a.quality]), // sort by quality. rare, epic, legendary
-    (c => c.achievement ? 1 : 0), // achievement items (origins edition/blizzcon) go at the bottom
-    (b => EVENTORDER[EVENTORDER[b.group] ? b.group : b.event]), // event items go below normal items
-    (d => d.name.toLowerCase()) // everything in their respective groups is sorted by name
+
+  hero.items[type] = _.sortBy(items, [
+    (a => a.standardItem && a.event ? 1 : a.standardItem ? 0 : 1), // Standard items at top (if they're not in an event)
+    (b => qualityOrder[b.quality]), // sort by quality. rare, epic, legendary
+    (c => !c.achievement && !c.event ? 0 : 1), // non achievement/event items on top
+    (d => d.achievement ? 1 : 0), // achievement items below event items
+    (e => _.isString(e.achievement)), // Put special achievements below normal achievments (cute/pixel)
+    (d => d.achievement === 'blizzard' ? 0 : 1), // put blizzard special items above SUPER special items (pink mercy stuff)
+    (f => EVENTORDER[EVENTORDER[f.group] ? f.group : f.event]), // sort events by event order
+    (g => g.name.toLowerCase()), // everything in their respective groups is sorted by name
+    (g => g.hero)
   ]);
 }));
 
@@ -487,12 +623,13 @@ var masterData = {
   currentEvent: CURRENTEVENT,
   prices: {
     undefined: 25,
-    'common': 25,
-    'rare': 75,
-    'epic': 250,
-    'legendary': 1000,
-    'golden': 0 // golden weapons
+    common: 25,
+    rare: 75,
+    epic: 250,
+    legendary: 1000,
+    golden: 0 // golden weapons
   },
+  latest_events: LATEST_EVENTS,
   events: updates,
   heroes
 };
